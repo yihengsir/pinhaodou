@@ -1,1 +1,939 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>拼好豆</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 隐藏滚动条但保留滚动功能 */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* 呼吸与弹跳动画 */
+    @keyframes bounce-short {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .animate-bounce-short { animation: bounce-short 0.5s ease-in-out 1; }
+    
+    /* 禁用画布的默认长按菜单和选中 */
+    canvas {
+      touch-action: none;
+      -webkit-touch-callout: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
 
+    body { overscroll-behavior-y: contain; }
+  </style>
+</head>
+<!-- 纯净浅灰背景色 -->
+<body class="bg-gray-50 text-gray-800 font-sans h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- 视图0：邀请码登录 -->
+  <div id="view-login" class="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm transition-opacity duration-500">
+    <div class="bg-white p-10 rounded-3xl shadow-2xl flex flex-col items-center max-w-sm w-11/12">
+      <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-indigo-100">
+        <svg class="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path></svg>
+      </div>
+      <h1 class="text-3xl font-extrabold text-gray-900 mb-2 tracking-widest">拼好豆</h1>
+      <p class="text-gray-500 text-sm mb-8 font-bold">极致极简的像素艺术工坊</p>
+      
+      <input type="password" id="input-invite" placeholder="输入邀请码" class="w-full bg-gray-50 border border-gray-200 text-gray-900 font-bold px-4 py-3 rounded-2xl outline-none focus:bg-white focus:border-indigo-500 transition-all text-center mb-4 tracking-widest placeholder-gray-400">
+      <button id="btn-enter" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white border-none px-8 py-3 rounded-2xl font-bold transition-all shadow-lg hover:shadow-xl">进入工坊</button>
+      <p id="login-error" class="text-red-500 font-bold mt-4 text-sm opacity-0 transition-opacity">邀请码错误，请重试</p>
+    </div>
+  </div>
+
+  <!-- 视图1：画廊 (主页) -->
+  <div id="view-gallery" class="absolute inset-0 p-6 overflow-y-auto z-20 transition-opacity duration-300 hidden opacity-0">
+    <div class="max-w-5xl mx-auto">
+      
+      <!-- 头部与上传控制 (圆角白底卡片) -->
+      <div class="flex flex-col md:flex-row justify-between items-center mb-10 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 gap-4">
+        <div class="text-center md:text-left">
+          <h1 class="text-3xl font-extrabold text-gray-900 flex items-center justify-center md:justify-start gap-3">
+            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            拼好豆
+          </h1>
+          <p class="text-gray-500 mt-2 font-bold">等比例解析，极致解压像素画</p>
+        </div>
+        
+        <div class="flex items-center gap-3 bg-gray-50 p-2 rounded-3xl border border-gray-100 shadow-inner">
+          <div class="flex flex-col px-3">
+            <label class="text-xs text-gray-500 font-bold mb-1">选择网格精度</label>
+            <select id="grid-size-select" class="bg-white border border-gray-200 text-gray-800 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2 font-bold outline-none cursor-pointer shadow-sm">
+              <option value="16">16 x 16</option>
+              <option value="24">24 x 24</option>
+              <option value="40">40 x 40</option>
+              <option value="70" selected>70 x 70 (推荐)</option>
+              <option value="100">100 x 100</option>
+              <option value="128">128 x 128</option>
+              <option value="192">192 x 192</option>
+            </select>
+          </div>
+          <button id="btn-upload" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white border-none h-full px-6 py-3 rounded-2xl font-bold shadow-md hover:shadow-lg transition-all whitespace-nowrap">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+            上传图片
+          </button>
+          <input type="file" id="file-input" accept="image/*" class="hidden">
+        </div>
+      </div>
+
+      <!-- 本地画廊 -->
+      <div id="gallery-container" class="mb-12 hidden">
+        <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+          <svg class="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+          本地画廊 <span class="text-sm font-normal text-gray-400 ml-2">(自动保存)</span>
+        </h2>
+        <div id="saved-works-grid" class="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <!-- 动态注入保存的作品 -->
+        </div>
+      </div>
+
+      <!-- 快速开始模板 -->
+      <div>
+        <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+          <svg class="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          内置模板
+        </h2>
+        <div id="templates-grid" class="grid grid-cols-3 md:grid-cols-6 gap-4">
+          <!-- 动态注入模板 -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 视图2：工作区 -->
+  <div id="view-workspace" class="absolute inset-0 flex flex-col z-10 hidden opacity-0 transition-opacity duration-300 bg-gray-50">
+    
+    <!-- 顶部状态栏 -->
+    <div class="bg-white text-gray-800 p-4 flex justify-between items-center shadow-sm border-b border-gray-200 z-10 shrink-0">
+      <button id="btn-home" class="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl transition-colors flex items-center justify-center">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+      </button>
+      
+      <div class="flex-1 max-w-xl mx-4 md:mx-8">
+        <div class="flex justify-between text-xs md:text-sm font-bold text-gray-600 mb-1">
+          <span>进度: <span id="ui-progress">0.0</span>% (<span id="ui-grid-size">70x70</span>)</span>
+          <span><span id="ui-bead-count">0</span> / <span id="ui-total-cells">4900</span> 颗</span>
+        </div>
+        <div class="h-4 bg-gray-100 rounded-full overflow-hidden border border-gray-200 shadow-inner">
+          <div id="ui-progress-bar" class="h-full bg-indigo-500 transition-all duration-100" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 md:gap-6">
+        <div id="ui-timer" class="hidden md:block font-mono text-xl font-bold text-indigo-600 bg-gray-50 border border-gray-200 px-4 py-1 rounded-xl shadow-sm">00:00</div>
+        
+        <!-- 模式切换 -->
+        <div class="flex bg-gray-100 rounded-2xl p-1 border border-gray-200 shadow-inner shrink-0">
+          <button id="btn-mode-manual" class="flex items-center gap-1 md:gap-2 px-3 py-2 md:px-4 rounded-xl font-bold transition-all text-xs md:text-base">
+            慢拼
+          </button>
+          <button id="btn-mode-gun" class="flex items-center gap-1 md:gap-2 px-3 py-2 md:px-4 rounded-xl font-bold transition-all text-xs md:text-base">
+            解压机枪
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 画布区域 -->
+    <div class="flex-1 overflow-hidden flex flex-col items-center justify-center p-4 relative">
+      <div id="gun-hint" class="absolute top-6 text-indigo-700 bg-white px-4 py-2 rounded-2xl border border-gray-200 font-bold text-sm animate-pulse pointer-events-none hidden z-20 shadow-lg">
+        👇 长按下方画布开启极速扫射！
+      </div>
+      
+      <!-- 画布容器 (圆角白边框) -->
+      <div class="bg-white shadow-xl overflow-hidden border-4 border-white relative rounded-2xl"
+           style="width: 100%; max-width: 80vh; aspect-ratio: 1/1; max-height: 100%; touch-action: none;">
+        <canvas id="perler-canvas" class="absolute inset-0 w-full h-full cursor-crosshair"></canvas>
+      </div>
+    </div>
+
+    <!-- 底部色板 -->
+    <div id="palette-bar" class="bg-white border-t border-gray-200 p-4 transition-transform duration-300 transform translate-y-0 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+      <div id="palette-container" class="max-w-4xl mx-auto flex gap-2 justify-center flex-wrap">
+        <!-- 色板动态生成 -->
+      </div>
+      <div class="text-center text-gray-500 text-xs md:text-sm mt-3 font-bold">
+        在上方画布点击半透明提示点填入选中的颜色
+      </div>
+    </div>
+  </div>
+
+  <!-- 弹窗：完成保存 -->
+  <div id="modal-save" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 hidden opacity-0 transition-opacity">
+    <div class="bg-white p-8 rounded-3xl max-w-md w-11/12 text-center shadow-2xl transform scale-95 transition-transform duration-300" id="modal-save-content">
+      <div class="w-20 h-20 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-green-100">
+        <svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+      </div>
+      <h2 class="text-3xl font-extrabold text-gray-900 mb-2">大功告成！</h2>
+      <p class="text-gray-600 mb-6 font-bold">
+        成功拼入 <span id="save-bead-count" class="text-indigo-600 font-extrabold">0</span> 颗拼豆<br>
+        耗时 <span id="save-timer" class="text-indigo-600 font-extrabold">00:00</span>
+      </p>
+      
+      <input type="text" id="input-work-name" placeholder="给你的作品起个名字吧" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-2xl mb-6 text-center text-lg focus:border-indigo-500 outline-none transition-colors font-bold text-gray-900">
+      
+      <div class="flex gap-4">
+        <button id="btn-save-cancel" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-colors">不保存返回</button>
+        <button id="btn-save-confirm" class="flex-1 py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 shadow-lg hover:shadow-xl transition-all">永久存入画廊</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 弹窗：确认删除 -->
+  <div id="modal-delete" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 hidden opacity-0 transition-opacity">
+    <div class="bg-white p-6 rounded-3xl max-w-sm w-11/12 text-center shadow-2xl">
+      <div class="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-red-100">
+        <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+      </div>
+      <h3 class="text-xl font-bold mb-2 text-gray-900">确认删除？</h3>
+      <p class="text-gray-500 mb-6 font-bold">该作品将从本地画廊永久移除。</p>
+      <div class="flex gap-4">
+        <button id="btn-del-cancel" class="flex-1 py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-colors">取消</button>
+        <button id="btn-del-confirm" class="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold hover:bg-red-600 transition-colors shadow-lg">确定删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 弹窗：恢复上次未完成的工作 -->
+  <div id="modal-resume" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 hidden opacity-0 transition-opacity">
+    <div class="bg-white p-6 rounded-3xl max-w-sm w-11/12 text-center shadow-2xl">
+      <h3 class="text-xl font-bold mb-2 text-gray-900">检测到未完成的拼豆</h3>
+      <p class="text-gray-500 mb-6 font-bold text-sm">你有上次中断的拼图记录，是否继续完成它？</p>
+      <div class="flex flex-col gap-3">
+        <button id="btn-resume-yes" class="w-full py-3 bg-indigo-600 text-white rounded-2xl font-bold hover:bg-indigo-700 shadow-lg transition-all">继续拼图</button>
+        <button id="btn-resume-no" class="w-full py-3 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-colors">丢弃旧进度，重头开始</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /** ==========================================
+     * 核心配置与状态管理
+     * ========================================== */
+    const PALETTE = [
+      '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF',
+      '#FFFF00', '#00FFFF', '#FF00FF', '#FFA500', '#8B4513',
+      '#FFC0CB', '#800080', '#808080', '#FFD700', '#4B0082',
+      '#008080', '#E6E6FA', '#F5F5DC', '#00FF7F', '#DC143C'
+    ];
+    
+    // 基础状态
+    let STATE = {
+      view: 'gallery',
+      mode: 'manual',
+      gridSize: 70,
+      totalCells: 4900,
+      targetPattern: [],
+      currentGrid: [],
+      selectedColor: PALETTE[0],
+      timer: 0,
+      beadCount: 0,
+      isComplete: false,
+      savedWorks: [],
+      templates: [],
+      timerInterval: null,
+      autoSaveInterval: null,
+      isFiring: false,
+      gunTimeout: null,
+      currentDelay: 200,
+      workToDeleteId: null
+    };
+
+    let audioCtx = null;
+
+    // DOM 元素引用
+    const DOM = {
+      viewLogin: document.getElementById('view-login'),
+      inputInvite: document.getElementById('input-invite'),
+      btnEnter: document.getElementById('btn-enter'),
+      loginError: document.getElementById('login-error'),
+
+      viewGallery: document.getElementById('view-gallery'),
+      viewWorkspace: document.getElementById('view-workspace'),
+      btnUpload: document.getElementById('btn-upload'),
+      fileInput: document.getElementById('file-input'),
+      gridSizeSelect: document.getElementById('grid-size-select'),
+      galleryContainer: document.getElementById('gallery-container'),
+      savedWorksGrid: document.getElementById('saved-works-grid'),
+      templatesGrid: document.getElementById('templates-grid'),
+      
+      btnHome: document.getElementById('btn-home'),
+      uiProgress: document.getElementById('ui-progress'),
+      uiProgressBar: document.getElementById('ui-progress-bar'),
+      uiBeadCount: document.getElementById('ui-bead-count'),
+      uiTotalCells: document.getElementById('ui-total-cells'),
+      uiTimer: document.getElementById('ui-timer'),
+      uiGridSize: document.getElementById('ui-grid-size'),
+      
+      btnModeManual: document.getElementById('btn-mode-manual'),
+      btnModeGun: document.getElementById('btn-mode-gun'),
+      gunHint: document.getElementById('gun-hint'),
+      paletteBar: document.getElementById('palette-bar'),
+      paletteContainer: document.getElementById('palette-container'),
+      
+      canvas: document.getElementById('perler-canvas'),
+      
+      modalSave: document.getElementById('modal-save'),
+      inputWorkName: document.getElementById('input-work-name'),
+      saveBeadCount: document.getElementById('save-bead-count'),
+      saveTimer: document.getElementById('save-timer'),
+      btnSaveCancel: document.getElementById('btn-save-cancel'),
+      btnSaveConfirm: document.getElementById('btn-save-confirm'),
+
+      modalDelete: document.getElementById('modal-delete'),
+      btnDelCancel: document.getElementById('btn-del-cancel'),
+      btnDelConfirm: document.getElementById('btn-del-confirm'),
+
+      modalResume: document.getElementById('modal-resume'),
+      btnResumeYes: document.getElementById('btn-resume-yes'),
+      btnResumeNo: document.getElementById('btn-resume-no'),
+    };
+
+    const ctx = DOM.canvas.getContext('2d', { alpha: false }); 
+    const BEAD_PIXEL_SIZE = 15;
+
+    /** ==========================================
+     * 认证模块
+     * ========================================== */
+    const checkAuth = () => {
+      if (localStorage.getItem('phd_auth') === '1314') {
+        DOM.viewLogin.classList.add('hidden');
+        initApp();
+      } else {
+        DOM.viewLogin.classList.remove('hidden');
+      }
+    };
+
+    DOM.btnEnter.onclick = () => {
+      if (DOM.inputInvite.value === '1314') {
+        localStorage.setItem('phd_auth', '1314');
+        DOM.loginError.classList.add('opacity-0');
+        DOM.viewLogin.style.opacity = '0';
+        setTimeout(() => {
+          DOM.viewLogin.classList.add('hidden');
+          initApp();
+        }, 500);
+      } else {
+        DOM.loginError.classList.remove('opacity-0');
+      }
+    };
+
+    /** ==========================================
+     * 工具与通用函数
+     * ========================================== */
+    const formatTime = (seconds) => {
+      const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const s = (seconds % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    };
+
+    const hexToRgb = (hex) => {
+      const bigint = parseInt(hex.slice(1), 16);
+      return [(bigint >> 16) & 255, (bigint >> 8) & 255, bigint & 255];
+    };
+
+    const colorDistance = (rgb1, rgb2) => {
+      return Math.sqrt(Math.pow(rgb1[0] - rgb2[0], 2) + Math.pow(rgb1[1] - rgb2[1], 2) + Math.pow(rgb1[2] - rgb2[2], 2));
+    };
+
+    const getClosestPaletteColor = (r, g, b) => {
+      let closestColor = PALETTE[0];
+      let minDistance = Infinity;
+      PALETTE.forEach(hex => {
+        const dist = colorDistance([r, g, b], hexToRgb(hex));
+        if (dist < minDistance) { minDistance = dist; closestColor = hex; }
+      });
+      return closestColor;
+    };
+
+    const playSound = (type = 'manual') => {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        const now = audioCtx.currentTime;
+        if (type === 'gun') {
+          const freq = 300 + Math.random() * 400; 
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.exponentialRampToValueAtTime(freq / 2, now + 0.05);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+          osc.start(now); osc.stop(now + 0.05);
+        } else {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(350, now);
+          osc.frequency.exponentialRampToValueAtTime(150, now + 0.1);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+          osc.start(now); osc.stop(now + 0.1);
+        }
+      } catch (e) {}
+    };
+
+    /** ==========================================
+     * 核心渲染引擎 (Canvas)
+     * ========================================== */
+    const initCanvas = () => {
+      DOM.canvas.width = STATE.gridSize * BEAD_PIXEL_SIZE;
+      DOM.canvas.height = STATE.gridSize * BEAD_PIXEL_SIZE;
+      ctx.fillStyle = '#f8f9fa'; 
+      ctx.fillRect(0, 0, DOM.canvas.width, DOM.canvas.height);
+      
+      ctx.strokeStyle = '#edf2f7';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for(let i=0; i<=STATE.gridSize; i++) {
+        const pos = i * BEAD_PIXEL_SIZE;
+        ctx.moveTo(pos, 0); ctx.lineTo(pos, DOM.canvas.height);
+        ctx.moveTo(0, pos); ctx.lineTo(DOM.canvas.width, pos);
+      }
+      ctx.stroke();
+    };
+
+    const drawCell = (index) => {
+      const col = index % STATE.gridSize;
+      const row = Math.floor(index / STATE.gridSize);
+      const x = col * BEAD_PIXEL_SIZE;
+      const y = row * BEAD_PIXEL_SIZE;
+      const color = STATE.currentGrid[index];
+      const targetColor = STATE.targetPattern[index];
+      const halfSize = BEAD_PIXEL_SIZE / 2;
+      const cx = x + halfSize;
+      const cy = y + halfSize;
+
+      ctx.fillStyle = color ? color : '#f8f9fa';
+      ctx.fillRect(x + 1, y + 1, BEAD_PIXEL_SIZE - 2, BEAD_PIXEL_SIZE - 2);
+
+      if (color && color !== '#FFFFFF') { // 绘制拼豆本体
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(cx, cy, halfSize - 1, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.beginPath(); ctx.arc(cx, cy, BEAD_PIXEL_SIZE / 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.beginPath(); ctx.arc(cx - 2, cy - 2, 2, 0, Math.PI*2); ctx.fill();
+      } else if (targetColor && targetColor !== '#FFFFFF' && STATE.mode === 'manual') {
+        // 背景色/白色不绘制提示点
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = targetColor;
+        ctx.beginPath(); ctx.arc(cx, cy, halfSize / 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1.0;
+      }
+    };
+
+    const drawFullGrid = () => {
+      initCanvas();
+      for (let i = 0; i < STATE.totalCells; i++) {
+        drawCell(i);
+      }
+    };
+
+    const updateUI = () => {
+      const progress = (STATE.beadCount / STATE.totalCells) * 100;
+      DOM.uiProgress.innerText = progress.toFixed(1);
+      DOM.uiProgressBar.style.width = `${progress}%`;
+      DOM.uiBeadCount.innerText = STATE.beadCount;
+      DOM.uiTimer.innerText = formatTime(STATE.timer);
+    };
+
+    const startTimers = () => {
+      clearInterval(STATE.timerInterval);
+      clearInterval(STATE.autoSaveInterval);
+      STATE.timerInterval = setInterval(() => {
+        if (!STATE.isComplete && STATE.view === 'workspace') {
+          STATE.timer++;
+          DOM.uiTimer.innerText = formatTime(STATE.timer);
+        }
+      }, 1000);
+
+      STATE.autoSaveInterval = setInterval(() => {
+        if (!STATE.isComplete && STATE.view === 'workspace' && STATE.beadCount > 0) {
+          saveWIPLocally();
+        }
+      }, 5000);
+    };
+
+    const stopTimers = () => {
+      clearInterval(STATE.timerInterval);
+      clearInterval(STATE.autoSaveInterval);
+    };
+
+    const checkCompletion = () => {
+      if (STATE.beadCount === STATE.totalCells && STATE.beadCount > 0 && !STATE.isComplete) {
+        STATE.isComplete = true;
+        stopTimers();
+        playSound('gun');
+        localStorage.removeItem('phd_wip');
+        DOM.saveBeadCount.innerText = STATE.beadCount;
+        DOM.saveTimer.innerText = formatTime(STATE.timer);
+        showModal(DOM.modalSave);
+      }
+    };
+
+    /** ==========================================
+     * 交互逻辑
+     * ========================================== */
+    const handleCanvasClickOrTouch = (e) => {
+      if (STATE.mode !== 'manual' || STATE.isComplete) return;
+      e.preventDefault();
+      
+      const rect = DOM.canvas.getBoundingClientRect();
+      const scaleX = DOM.canvas.width / rect.width;
+      const scaleY = DOM.canvas.height / rect.height;
+      
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      
+      const x = (clientX - rect.left) * scaleX;
+      const y = (clientY - rect.top) * scaleY;
+      
+      const col = Math.floor(x / BEAD_PIXEL_SIZE);
+      const row = Math.floor(y / BEAD_PIXEL_SIZE);
+      
+      if (col < 0 || col >= STATE.gridSize || row < 0 || row >= STATE.gridSize) return;
+      
+      const index = row * STATE.gridSize + col;
+      
+      if (!STATE.currentGrid[index] && STATE.selectedColor === STATE.targetPattern[index]) {
+        STATE.currentGrid[index] = STATE.selectedColor;
+        STATE.beadCount++;
+        drawCell(index);
+        playSound('manual');
+        updateUI();
+        checkCompletion();
+      }
+    };
+
+    const startGunFire = (e) => {
+      if (e) e.preventDefault();
+      if (STATE.mode !== 'gun' || STATE.isComplete) return;
+      
+      STATE.isFiring = true;
+      STATE.currentDelay = 150; 
+      
+      const fire = () => {
+        if (!STATE.isFiring) return;
+        
+        let targetIndex = -1;
+        for (let r = STATE.gridSize - 1; r >= 0; r--) {
+          for (let c = 0; c < STATE.gridSize; c++) {
+            const idx = r * STATE.gridSize + c;
+            if (!STATE.currentGrid[idx]) {
+              targetIndex = idx;
+              break;
+            }
+          }
+          if (targetIndex !== -1) break;
+        }
+
+        if (targetIndex === -1) {
+          STATE.isFiring = false;
+          checkCompletion();
+          return;
+        }
+
+        STATE.currentGrid[targetIndex] = STATE.targetPattern[targetIndex];
+        STATE.beadCount++;
+        drawCell(targetIndex);
+        playSound('gun');
+        updateUI();
+
+        if (STATE.isFiring) {
+          STATE.currentDelay = Math.max(5, STATE.currentDelay * 0.82);
+          STATE.gunTimeout = setTimeout(fire, STATE.currentDelay);
+        }
+      };
+      
+      fire();
+    };
+
+    const stopGunFire = () => {
+      STATE.isFiring = false;
+      if (STATE.gunTimeout) clearTimeout(STATE.gunTimeout);
+    };
+
+    /** ==========================================
+     * 图像处理引擎 (保持原始长宽比)
+     * ========================================== */
+    const processImage = (dataUrl, size) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const offCanvas = document.createElement('canvas');
+          offCanvas.width = size;
+          offCanvas.height = size;
+          const oCtx = offCanvas.getContext('2d');
+          
+          oCtx.fillStyle = '#FFFFFF';
+          oCtx.fillRect(0, 0, size, size);
+          
+          oCtx.filter = 'contrast(160%) saturate(140%) brightness(110%)';
+          
+          // 计算 Aspect Ratio，等比缩放居中，绝不拉伸
+          const scale = Math.min(size / img.width, size / img.height);
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const x = Math.round((size - w) / 2);
+          const y = Math.round((size - h) / 2);
+          
+          oCtx.drawImage(img, x, y, w, h);
+          
+          const imgData = oCtx.getImageData(0, 0, size, size).data;
+          const pattern = new Array(size * size);
+          
+          for (let i = 0; i < imgData.length; i += 4) {
+            const r = imgData[i], g = imgData[i+1], b = imgData[i+2], a = imgData[i+3];
+            if (a < 50) {
+              pattern[i/4] = '#FFFFFF'; // 透明底视为白色背景填充
+            } else {
+              pattern[i/4] = getClosestPaletteColor(r, g, b);
+            }
+          }
+          resolve({ pattern, size });
+        };
+        img.src = dataUrl;
+      });
+    };
+
+    const buildTemplates = async () => {
+      const emojis = ['❤️', '😀', '⭐', '🚀', '⚔️'];
+      const temps = [];
+      const tempSize = 40; 
+      for (const char of emojis) {
+        const c = document.createElement('canvas');
+        c.width = tempSize; c.height = tempSize;
+        const cx = c.getContext('2d');
+        cx.fillStyle = '#FFFFFF'; cx.fillRect(0, 0, tempSize, tempSize);
+        cx.font = '34px sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+        cx.fillText(char, tempSize/2, tempSize/2 + 2);
+        
+        const { pattern } = await processImage(c.toDataURL(), tempSize);
+        temps.push({ id: `t_${char}`, name: `模板 ${char}`, pattern, size: tempSize });
+      }
+      STATE.templates = temps;
+      renderTemplates();
+    };
+
+    /** ==========================================
+     * UI 切换与控制
+     * ========================================== */
+    const switchView = (viewName) => {
+      STATE.view = viewName;
+      if (viewName === 'gallery') {
+        DOM.viewGallery.classList.remove('hidden');
+        DOM.viewWorkspace.classList.add('hidden');
+        setTimeout(() => {
+          DOM.viewGallery.classList.remove('opacity-0');
+          DOM.viewWorkspace.classList.add('opacity-0');
+        }, 10);
+        stopTimers();
+        renderGallery();
+      } else {
+        DOM.viewWorkspace.classList.remove('hidden');
+        DOM.viewGallery.classList.add('hidden');
+        setTimeout(() => {
+          DOM.viewWorkspace.classList.remove('opacity-0');
+          DOM.viewGallery.classList.add('opacity-0');
+        }, 10);
+        
+        // 生成色板，统一更改为圆角卡片按钮
+        DOM.paletteContainer.innerHTML = PALETTE.map(hex => `
+          <button onclick="selectColor('${hex}')" class="w-8 h-8 md:w-10 md:h-10 rounded-2xl border-2 transition-transform shadow-sm ${STATE.selectedColor === hex ? 'border-gray-800 scale-125 shadow-lg' : 'border-gray-200 hover:scale-110'}" style="background-color: ${hex}"></button>
+        `).join('');
+        
+        updateUIMode();
+        updateUI();
+        DOM.uiGridSize.innerText = `${STATE.gridSize}x${STATE.gridSize}`;
+        DOM.uiTotalCells.innerText = STATE.totalCells;
+        
+        drawFullGrid();
+        if (!STATE.isComplete) startTimers();
+      }
+    };
+
+    const updateUIMode = () => {
+      if (STATE.mode === 'manual') {
+        DOM.btnModeManual.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+        DOM.btnModeManual.classList.remove('text-gray-600');
+        DOM.btnModeGun.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
+        DOM.btnModeGun.classList.add('text-gray-600');
+        DOM.paletteBar.classList.replace('translate-y-full', 'translate-y-0');
+        DOM.paletteBar.classList.replace('absolute', 'relative');
+        DOM.gunHint.classList.add('hidden');
+        drawFullGrid(); 
+      } else {
+        DOM.btnModeGun.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+        DOM.btnModeGun.classList.remove('text-gray-600');
+        DOM.btnModeManual.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
+        DOM.btnModeManual.classList.add('text-gray-600');
+        DOM.paletteBar.classList.replace('translate-y-0', 'translate-y-full');
+        DOM.paletteBar.classList.replace('relative', 'absolute');
+        if (!STATE.isComplete) DOM.gunHint.classList.remove('hidden');
+        drawFullGrid(); 
+      }
+    };
+
+    window.selectColor = (hex) => {
+      STATE.selectedColor = hex;
+      updateUIMode(); 
+    };
+
+    const startWork = (patternArray, size, existingGrid = null, existingTimer = 0, existingBeads = 0) => {
+      STATE.gridSize = size;
+      STATE.totalCells = size * size;
+      STATE.targetPattern = patternArray;
+      STATE.currentGrid = existingGrid || new Array(STATE.totalCells).fill(null);
+      // 预先将背景白色全部算作已拼入，这样可以省去大片空白的点击
+      if (!existingGrid) {
+        for(let i=0; i<STATE.totalCells; i++) {
+          if(STATE.targetPattern[i] === '#FFFFFF') {
+            STATE.currentGrid[i] = '#FFFFFF';
+            existingBeads++;
+          }
+        }
+      }
+      
+      STATE.timer = existingTimer;
+      STATE.beadCount = existingBeads;
+      STATE.isComplete = (STATE.beadCount === STATE.totalCells && STATE.beadCount > 0);
+      switchView('workspace');
+    };
+
+    /** ==========================================
+     * 本地存储持久化与画廊
+     * ========================================== */
+    const loadFromLocal = () => {
+      STATE.savedWorks = JSON.parse(localStorage.getItem('phd_works_v2') || '[]');
+      renderGallery();
+      
+      const wip = JSON.parse(localStorage.getItem('phd_wip') || 'null');
+      if (wip && wip.beadCount < wip.totalCells && wip.beadCount > 0) {
+        showModal(DOM.modalResume);
+        
+        DOM.btnResumeYes.onclick = () => {
+          hideModal(DOM.modalResume);
+          startWork(wip.targetPattern, wip.gridSize, wip.currentGrid, wip.timer, wip.beadCount);
+        };
+        DOM.btnResumeNo.onclick = () => {
+          hideModal(DOM.modalResume);
+          localStorage.removeItem('phd_wip');
+        };
+      }
+    };
+
+    const saveWIPLocally = () => {
+      const wip = {
+        gridSize: STATE.gridSize,
+        totalCells: STATE.totalCells,
+        targetPattern: STATE.targetPattern,
+        currentGrid: STATE.currentGrid,
+        timer: STATE.timer,
+        beadCount: STATE.beadCount
+      };
+      try {
+        localStorage.setItem('phd_wip', JSON.stringify(wip));
+      } catch (e) {
+        console.warn('Storage limit reached, WIP not saved.');
+      }
+    };
+
+    const renderGallery = () => {
+      if (STATE.savedWorks.length > 0) {
+        DOM.galleryContainer.classList.remove('hidden');
+        DOM.savedWorksGrid.innerHTML = STATE.savedWorks.map(w => `
+          <div class="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-all group relative border border-gray-100 cursor-pointer" onclick="resumeSavedWork('${w.id}')">
+            <div class="aspect-square bg-gray-50 p-2 relative">
+              <img src="${w.thumb}" alt="${w.name}" class="w-full h-full object-contain drop-shadow-md pointer-events-none" />
+              <div class="absolute inset-0 bg-black/0 group-hover:bg-gray-900/10 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <button onclick="event.stopPropagation(); exportWork('${w.id}')" class="bg-white text-gray-800 p-2 rounded-2xl m-1 hover:bg-gray-100 shadow-sm" title="导出图片">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                </button>
+                <button onclick="event.stopPropagation(); confirmDeleteWork('${w.id}')" class="bg-white text-red-500 p-2 rounded-2xl m-1 hover:bg-red-50 shadow-sm" title="删除">
+                   <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+              </div>
+            </div>
+            <div class="p-4 border-t border-gray-50">
+              <h3 class="font-bold text-gray-800 truncate text-sm md:text-base">${w.name}</h3>
+              <div class="flex justify-between text-xs text-gray-500 mt-2 font-mono font-bold">
+                <span>${formatTime(w.timer)}</span>
+                <span>${w.size}x${w.size}</span>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        DOM.galleryContainer.classList.add('hidden');
+      }
+    };
+
+    const renderTemplates = () => {
+      DOM.templatesGrid.innerHTML = STATE.templates.map(t => {
+        const c = document.createElement('canvas');
+        c.width = t.size * 4; c.height = t.size * 4;
+        const cx = c.getContext('2d');
+        t.pattern.forEach((color, i) => {
+          if(color!=='#FFFFFF'){
+            cx.fillStyle = color;
+            cx.fillRect((i%t.size)*4, Math.floor(i/t.size)*4, 4, 4);
+          }
+        });
+        return `
+          <div onclick="window.startNewFromTemplate('${t.id}')" class="bg-white p-4 rounded-3xl shadow-sm hover:shadow-md transition-all cursor-pointer text-center border border-gray-100 hover:border-indigo-100 group">
+            <div class="aspect-square mb-2 overflow-hidden rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center">
+               <img src="${c.toDataURL()}" class="w-full h-full object-contain opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-transform" />
+            </div>
+            <span class="font-bold text-gray-600 text-xs md:text-sm">${t.name}</span>
+          </div>
+        `;
+      }).join('');
+    };
+
+    window.startNewFromTemplate = (id) => {
+      const t = STATE.templates.find(x => x.id === id);
+      if(t) startWork(t.pattern, t.size);
+    };
+
+    window.resumeSavedWork = (id) => {
+      const w = STATE.savedWorks.find(x => x.id === id);
+      if(w) startWork(w.targetPattern, w.size, w.grid, w.timer, w.beadCount);
+    };
+
+    window.exportWork = (id) => {
+      const w = STATE.savedWorks.find(x => x.id === id);
+      if(!w) return;
+      const link = document.createElement('a');
+      link.download = `${w.name}.png`;
+      link.href = w.thumb; 
+      link.click();
+    };
+
+    window.confirmDeleteWork = (id) => {
+      STATE.workToDeleteId = id;
+      showModal(DOM.modalDelete);
+    };
+
+    /** ==========================================
+     * 弹窗与事件绑定
+     * ========================================== */
+    const showModal = (el) => {
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.remove('opacity-0'), 10);
+    };
+    const hideModal = (el) => {
+      el.classList.add('opacity-0');
+      setTimeout(() => el.classList.add('hidden'), 300);
+    };
+
+    DOM.btnUpload.onclick = () => DOM.fileInput.click();
+    DOM.fileInput.onchange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const selectedSize = parseInt(DOM.gridSizeSelect.value, 10);
+          const { pattern, size } = await processImage(event.target.result, selectedSize);
+          startWork(pattern, size);
+          DOM.fileInput.value = ''; 
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    DOM.canvas.addEventListener('mousedown', (e) => { if(STATE.mode==='manual') handleCanvasClickOrTouch(e); else startGunFire(e); });
+    DOM.canvas.addEventListener('mousemove', (e) => { if(STATE.mode==='manual' && e.buttons===1) handleCanvasClickOrTouch(e); });
+    window.addEventListener('mouseup', stopGunFire);
+    
+    DOM.canvas.addEventListener('touchstart', (e) => { if(STATE.mode==='manual') handleCanvasClickOrTouch(e); else startGunFire(e); });
+    DOM.canvas.addEventListener('touchmove', (e) => { if(STATE.mode==='manual') handleCanvasClickOrTouch(e); });
+    window.addEventListener('touchend', stopGunFire);
+    window.addEventListener('touchcancel', stopGunFire);
+
+    DOM.btnModeManual.onclick = () => { STATE.mode = 'manual'; updateUIMode(); };
+    DOM.btnModeGun.onclick = () => { STATE.mode = 'gun'; updateUIMode(); };
+
+    DOM.btnHome.onclick = () => {
+      saveWIPLocally(); 
+      switchView('gallery');
+    };
+
+    DOM.btnSaveCancel.onclick = () => {
+      hideModal(DOM.modalSave);
+      switchView('gallery');
+    };
+    
+    DOM.btnSaveConfirm.onclick = () => {
+      const c = document.createElement('canvas');
+      const renderSize = 10; 
+      c.width = STATE.gridSize * renderSize; c.height = STATE.gridSize * renderSize;
+      const ctx2 = c.getContext('2d', { alpha: false });
+      ctx2.fillStyle = '#f0f0f0'; ctx2.fillRect(0,0,c.width,c.height);
+      
+      STATE.currentGrid.forEach((col, i) => {
+        if(!col || col === '#FFFFFF') return; // 不绘制白色占位底
+        const x = (i % STATE.gridSize) * renderSize;
+        const y = Math.floor(i / STATE.gridSize) * renderSize;
+        ctx2.fillStyle = col;
+        ctx2.beginPath(); ctx2.arc(x+renderSize/2, y+renderSize/2, renderSize/2-1, 0, Math.PI*2); ctx2.fill();
+        ctx2.fillStyle='rgba(0,0,0,0.2)';
+        ctx2.beginPath(); ctx2.arc(x+renderSize/2, y+renderSize/2, renderSize/5, 0, Math.PI*2); ctx2.fill();
+      });
+
+      const newWork = {
+        id: 'w_' + Date.now(),
+        name: DOM.inputWorkName.value.trim() || `像素大作 ${new Date().toLocaleDateString()}`,
+        size: STATE.gridSize,
+        targetPattern: STATE.targetPattern,
+        grid: STATE.currentGrid,
+        timer: STATE.timer,
+        beadCount: STATE.beadCount,
+        thumb: c.toDataURL('image/jpeg', 0.8) 
+      };
+
+      try {
+        STATE.savedWorks.unshift(newWork);
+        localStorage.setItem('phd_works_v2', JSON.stringify(STATE.savedWorks));
+      } catch (e) {
+        alert("本地存储空间可能不足，无法永久保存超大画作。请清理历史画作后重试。");
+        STATE.savedWorks.shift();
+      }
+
+      hideModal(DOM.modalSave);
+      switchView('gallery');
+    };
+
+    DOM.btnDelCancel.onclick = () => { STATE.workToDeleteId = null; hideModal(DOM.modalDelete); };
+    DOM.btnDelConfirm.onclick = () => {
+      if(STATE.workToDeleteId) {
+        STATE.savedWorks = STATE.savedWorks.filter(w => w.id !== STATE.workToDeleteId);
+        localStorage.setItem('phd_works_v2', JSON.stringify(STATE.savedWorks));
+        renderGallery();
+      }
+      hideModal(DOM.modalDelete);
+    };
+
+    /** ==========================================
+     * 启动应用
+     * ========================================== */
+    const initApp = () => {
+      buildTemplates();
+      // 这里添加了关键的 switchView，确保验证通过后直接显示图库！
+      switchView('gallery');
+      loadFromLocal();
+    };
+
+    window.onload = checkAuth;
+
+  </script>
+</body>
+</html>
